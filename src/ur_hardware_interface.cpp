@@ -80,18 +80,9 @@ void UrHardwareInterface::init() {
 				"No joints found on parameter server for controller, did you load the proper yaml file?" << " Namespace: " << nh_.getNamespace());
 		exit(-1);
 	}
-	num_joints_ = joint_names_.size();
-
-	// Resize vectors
-	joint_position_.resize(num_joints_);
-	joint_velocity_.resize(num_joints_);
-	joint_effort_.resize(num_joints_);
-	joint_position_command_.resize(num_joints_);
-	joint_velocity_command_.resize(num_joints_);
-	prev_joint_velocity_command_.resize(num_joints_);
 
 	// Initialize controller
-	for (std::size_t i = 0; i < num_joints_; ++i) {
+  for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
 		ROS_DEBUG_STREAM_NAMED("ur_hardware_interface",
 				"Loading joint name: " << joint_names_[i]);
 
@@ -129,12 +120,12 @@ void UrHardwareInterface::init() {
 }
 
 void UrHardwareInterface::read() {
-	std::vector<double> pos, vel, current, tcp;
-	pos = robot_->rt_interface_->robot_state_->getQActual();
+  Vector6 pos, vel, current, tcp;
+  pos = robot_->rt_interface_->robot_state_->getQActual();
 	vel = robot_->rt_interface_->robot_state_->getQdActual();
 	current = robot_->rt_interface_->robot_state_->getIActual();
 	tcp = robot_->rt_interface_->robot_state_->getTcpForce();
-	for (std::size_t i = 0; i < num_joints_; ++i) {
+  for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
 		joint_position_[i] = pos[i];
 		joint_velocity_[i] = vel[i];
 		joint_effort_[i] = current[i];
@@ -256,8 +247,7 @@ void UrHardwareInterface::doSwitch(
 		if (controller_it->hardware_interface
 				== "hardware_interface::PositionJointInterface") {
 			position_interface_running_ = false;
-			std::vector<double> tmp;
-			robot_->closeServo(tmp);
+      robot_->closeServo();
 			ROS_DEBUG("Stopping position interface");
 		}
 	}

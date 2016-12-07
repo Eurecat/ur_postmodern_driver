@@ -18,39 +18,40 @@
 
 #include "ur_modern_driver/robot_state_RT.h"
 
-RobotStateRT::RobotStateRT(std::condition_variable& msg_cond) {
-	version_ = 0.0;
-	time_ = 0.0;
-	q_target_.assign(6, 0.0);
-	qd_target_.assign(6, 0.0);
-	qdd_target_.assign(6, 0.0);
-	i_target_.assign(6, 0.0);
-	m_target_.assign(6, 0.0);
-	q_actual_.assign(6, 0.0);
-	qd_actual_.assign(6, 0.0);
-	i_actual_.assign(6, 0.0);
-	i_control_.assign(6, 0.0);
-	tool_vector_actual_.assign(6, 0.0);
-	tcp_speed_actual_.assign(6, 0.0);
-	tcp_force_.assign(6, 0.0);
-	tool_vector_target_.assign(6, 0.0);
-	tcp_speed_target_.assign(6, 0.0);
-	digital_input_bits_.assign(64, false);
-	motor_temperatures_.assign(6, 0.0);
-	controller_timer_ = 0.0;
-	robot_mode_ = 0.0;
-	joint_modes_.assign(6, 0.0);
-	safety_mode_ = 0.0;
-	tool_accelerometer_values_.assign(3, 0.0);
-	speed_scaling_ = 0.0;
-	linear_momentum_norm_ = 0.0;
-	v_main_ = 0.0;
-	v_robot_ = 0.0;
-	i_robot_ = 0.0;
-	v_actual_.assign(6, 0.0);
-	data_published_ = false;
-	controller_updated_ = false;
-	pMsg_cond_ = &msg_cond;
+RobotStateRT::RobotStateRT(std::condition_variable& msg_cond):
+  version_(0.0),
+  time_(0.0),
+  controller_timer_(0.0),
+  robot_mode_(0.0),
+  safety_mode_(0.0),
+  speed_scaling_(0.0),
+  linear_momentum_norm_(0.0),
+  v_main_(0.0),
+  v_robot_(0.0),
+  i_robot_(0.0),
+  data_published_(false),
+  controller_updated_(false),
+  pMsg_cond_(&msg_cond)
+{
+  q_target_.fill(0.0);
+  qd_target_.fill(0.0);
+  qdd_target_.fill(0.0);
+  i_target_.fill(0.0);
+  m_target_.fill(0.0);
+  q_actual_.fill(0.0);
+  qd_actual_.fill(0.0);
+  i_actual_.fill(0.0);
+  i_control_.fill(0.0);
+  tool_vector_actual_.fill(0.0);
+  tcp_speed_actual_.fill(0.0);
+  tcp_force_.fill(0.0);
+  tool_vector_target_.fill(0.0);
+  tcp_speed_target_.fill(0.0);
+  digital_input_bits_.fill(false);
+  motor_temperatures_.fill(0.0);
+  joint_modes_.fill(0.0);
+  tool_accelerometer_values_.fill(0.0);
+  v_actual_.fill(0.0);
 }
 
 RobotStateRT::~RobotStateRT() {
@@ -74,6 +75,13 @@ bool RobotStateRT::getControllerUpdated() {
 	return controller_updated_;
 }
 
+void RobotStateRT::unpackDigitalInputBits(int64_t data, std::array<bool,64> &output)
+{
+  for (int i = 0; i < 64; i++) {
+      output[i] = ((data & (1 << i)) >> i);
+  }
+}
+
 double RobotStateRT::ntohd(uint64_t nf) {
 	double x;
 	nf = be64toh(nf);
@@ -81,237 +89,134 @@ double RobotStateRT::ntohd(uint64_t nf) {
 	return x;
 }
 
-void RobotStateRT::unpackVector(uint8_t * buf, int start_index,
-    int nr_of_vals, std::vector<double> &output) {
-	uint64_t q;
-  output.resize(nr_of_vals); // does nothing is the size is already nr_of_vals
-	for (int i = 0; i < nr_of_vals; i++) {
-		memcpy(&q, &buf[start_index + i * sizeof(q)], sizeof(q));
-    output[i] = (ntohd(q));
-	}
-}
-
-void RobotStateRT::unpackDigitalInputBits(int64_t data, std::vector<bool>& output) {
-  output.resize(64);
-	for (int i = 0; i < 64; i++) {
-    output[i] = ((data & (1 << i)) >> i);
-	}
-}
 
 void RobotStateRT::setVersion(double ver) {
-	val_lock_.lock();
+  std::unique_lock<std::mutex> locker(val_lock_);
 	version_ = ver;
-	val_lock_.unlock();
 }
 
 double RobotStateRT::getVersion() {
-	double ret;
-	val_lock_.lock();
-	ret = version_;
-	val_lock_.unlock();
-	return ret;
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return version_;
 }
 double RobotStateRT::getTime() {
-	double ret;
-	val_lock_.lock();
-	ret = time_;
-	val_lock_.unlock();
-	return ret;
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return time_;
 }
-std::vector<double> RobotStateRT::getQTarget() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = q_target_;
-	val_lock_.unlock();
-	return ret;
+Vector6 RobotStateRT::getQTarget() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return q_target_;
 }
-std::vector<double> RobotStateRT::getQdTarget() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = qd_target_;
-	val_lock_.unlock();
-	return ret;
+Vector6 RobotStateRT::getQdTarget() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return qd_target_;
 }
-std::vector<double> RobotStateRT::getQddTarget() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = qdd_target_;
-	val_lock_.unlock();
-	return ret;
+Vector6 RobotStateRT::getQddTarget() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return qdd_target_;
 }
-std::vector<double> RobotStateRT::getITarget() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = i_target_;
-	val_lock_.unlock();
-	return ret;
+Vector6 RobotStateRT::getITarget() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return i_target_;
 }
-std::vector<double> RobotStateRT::getMTarget() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = m_target_;
-	val_lock_.unlock();
-	return ret;
+Vector6 RobotStateRT::getMTarget() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return m_target_;
 }
-std::vector<double> RobotStateRT::getQActual() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = q_actual_;
-	val_lock_.unlock();
-	return ret;
+Vector6 RobotStateRT::getQActual() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return q_actual_;
 }
-std::vector<double> RobotStateRT::getQdActual() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = qd_actual_;
-	val_lock_.unlock();
-	return ret;
+Vector6 RobotStateRT::getQdActual() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return qd_actual_;
 }
-std::vector<double> RobotStateRT::getIActual() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = i_actual_;
-	val_lock_.unlock();
-	return ret;
+Vector6 RobotStateRT::getIActual() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return i_actual_;
 }
-std::vector<double> RobotStateRT::getIControl() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = i_control_;
-	val_lock_.unlock();
-	return ret;
+Vector6 RobotStateRT::getIControl() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return i_control_;
 }
-std::vector<double> RobotStateRT::getToolVectorActual() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = tool_vector_actual_;
-	val_lock_.unlock();
-	return ret;
+Vector6 RobotStateRT::getToolVectorActual() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return tool_vector_actual_;
 }
-std::vector<double> RobotStateRT::getTcpSpeedActual() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = tcp_speed_actual_;
-	val_lock_.unlock();
-	return ret;
+Vector6 RobotStateRT::getTcpSpeedActual() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return tcp_speed_actual_;
 }
-std::vector<double> RobotStateRT::getTcpForce() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = tcp_force_;
-	val_lock_.unlock();
-	return ret;
+Vector6 RobotStateRT::getTcpForce() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return tcp_force_;
 }
-std::vector<double> RobotStateRT::getToolVectorTarget() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = tool_vector_target_;
-	val_lock_.unlock();
-	return ret;
+Vector6 RobotStateRT::getToolVectorTarget() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return tool_vector_target_;
 }
-std::vector<double> RobotStateRT::getTcpSpeedTarget() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = tcp_speed_target_;
-	val_lock_.unlock();
-	return ret;
+Vector6 RobotStateRT::getTcpSpeedTarget() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return tcp_speed_target_;
 }
-std::vector<bool> RobotStateRT::getDigitalInputBits() {
-	std::vector<bool> ret;
-	val_lock_.lock();
-	ret = digital_input_bits_;
-	val_lock_.unlock();
-	return ret;
+std::array<bool, 64> RobotStateRT::getDigitalInputBits() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return digital_input_bits_;
 }
-std::vector<double> RobotStateRT::getMotorTemperatures() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = motor_temperatures_;
-	val_lock_.unlock();
-	return ret;
+Vector6 RobotStateRT::getMotorTemperatures() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return motor_temperatures_;
 }
 double RobotStateRT::getControllerTimer() {
-	double ret;
-	val_lock_.lock();
-	ret = controller_timer_;
-	val_lock_.unlock();
-	return ret;
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return controller_timer_;
 }
 double RobotStateRT::getRobotMode() {
-	double ret;
-	val_lock_.lock();
-	ret = robot_mode_;
-	val_lock_.unlock();
-	return ret;
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return robot_mode_;
 }
-std::vector<double> RobotStateRT::getJointModes() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = joint_modes_;
-	val_lock_.unlock();
-	return ret;
+Vector6 RobotStateRT::getJointModes() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return joint_modes_;
 }
 double RobotStateRT::getSafety_mode() {
-	double ret;
-	val_lock_.lock();
-	ret = safety_mode_;
-	val_lock_.unlock();
-	return ret;
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return safety_mode_;
 }
-std::vector<double> RobotStateRT::getToolAccelerometerValues() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = tool_accelerometer_values_;
-	val_lock_.unlock();
-	return ret;
+std::array<double,3> RobotStateRT::getToolAccelerometerValues() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return tool_accelerometer_values_;
 }
 double RobotStateRT::getSpeedScaling() {
-	double ret;
-	val_lock_.lock();
-	ret = speed_scaling_;
-	val_lock_.unlock();
-	return ret;
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return speed_scaling_;
 }
 double RobotStateRT::getLinearMomentumNorm() {
-	double ret;
-	val_lock_.lock();
-	ret = linear_momentum_norm_;
-	val_lock_.unlock();
-	return ret;
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return linear_momentum_norm_;
 }
 double RobotStateRT::getVMain() {
-	double ret;
-	val_lock_.lock();
-	ret = v_main_;
-	val_lock_.unlock();
-	return ret;
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return v_main_;
 }
 double RobotStateRT::getVRobot() {
-	double ret;
-	val_lock_.lock();
-	ret = v_robot_;
-	val_lock_.unlock();
-	return ret;
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return v_robot_;
 }
 double RobotStateRT::getIRobot() {
-	double ret;
-	val_lock_.lock();
-	ret = i_robot_;
-	val_lock_.unlock();
-	return ret;
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return i_robot_;
 }
-std::vector<double> RobotStateRT::getVActual() {
-	std::vector<double> ret;
-	val_lock_.lock();
-	ret = v_actual_;
-	val_lock_.unlock();
-	return ret;
+Vector6 RobotStateRT::getVActual() {
+  std::unique_lock<std::mutex> locker(val_lock_);
+  return v_actual_;
 }
+
 void RobotStateRT::unpack(uint8_t * buf) {
 	int64_t digital_input_bits;
 	uint64_t unpack_to;
 	uint16_t offset = 0;
-	val_lock_.lock();
+  std::unique_lock<std::mutex> locker(val_lock_);
 	int len;
 	memcpy(&len, &buf[offset], sizeof(len));
 	
@@ -339,57 +244,57 @@ void RobotStateRT::unpack(uint8_t * buf) {
 	
 	if (!len_good) {
 		printf("Wrong length of message on RT interface: %i\n", len);
-		val_lock_.unlock();
+
 		return;
 	}
 	
 	memcpy(&unpack_to, &buf[offset], sizeof(unpack_to));
 	time_ = RobotStateRT::ntohd(unpack_to);
 	offset += sizeof(double);
-  unpackVector(buf, offset, 6, q_target_);
+  unpackVector(buf, offset,  q_target_);
 	offset += sizeof(double) * 6;
-  unpackVector(buf, offset, 6, qd_target_);
+  unpackVector(buf, offset,  qd_target_);
 	offset += sizeof(double) * 6;
-  unpackVector(buf, offset, 6, qdd_target_);
+  unpackVector(buf, offset,  qdd_target_);
 	offset += sizeof(double) * 6;
-  unpackVector(buf, offset, 6, i_target_);
+  unpackVector(buf, offset,  i_target_);
 	offset += sizeof(double) * 6;
-  unpackVector(buf, offset, 6, m_target_);
+  unpackVector(buf, offset,  m_target_);
 	offset += sizeof(double) * 6;
-  unpackVector(buf, offset, 6, q_actual_);
+  unpackVector(buf, offset,  q_actual_);
 	offset += sizeof(double) * 6;
-  unpackVector(buf, offset, 6, qd_actual_);
+  unpackVector(buf, offset,  qd_actual_);
 	offset += sizeof(double) * 6;
-  unpackVector(buf, offset, 6, i_actual_);
+  unpackVector(buf, offset,  i_actual_);
 	offset += sizeof(double) * 6;
 	if (version_ <= 1.9) {
 		if (version_ > 1.6)
-      unpackVector(buf, offset, 3, tool_accelerometer_values_);
+      unpackVector(buf, offset, tool_accelerometer_values_);
 		offset += sizeof(double) * (3 + 15);
-    unpackVector(buf, offset, 6, tcp_force_);
+    unpackVector(buf, offset,  tcp_force_);
 		offset += sizeof(double) * 6;
-    unpackVector(buf, offset, 6, tool_vector_actual_);
+    unpackVector(buf, offset,  tool_vector_actual_);
 		offset += sizeof(double) * 6;
-    unpackVector(buf, offset, 6, tcp_speed_actual_);
+    unpackVector(buf, offset,  tcp_speed_actual_);
 	} else {
-    unpackVector(buf, offset, 6, i_control_);
+    unpackVector(buf, offset,  i_control_);
 		offset += sizeof(double) * 6;
-    unpackVector(buf, offset, 6, tool_vector_actual_);
+    unpackVector(buf, offset,  tool_vector_actual_);
 		offset += sizeof(double) * 6;
-    unpackVector(buf, offset, 6, tcp_speed_actual_);
+    unpackVector(buf, offset,  tcp_speed_actual_);
 		offset += sizeof(double) * 6;
-    unpackVector(buf, offset, 6, tcp_force_);
+    unpackVector(buf, offset,  tcp_force_);
 		offset += sizeof(double) * 6;
-    unpackVector(buf, offset, 6, tool_vector_target_);
+    unpackVector(buf, offset,  tool_vector_target_);
 		offset += sizeof(double) * 6;
-    unpackVector(buf, offset, 6, tcp_speed_target_);
+    unpackVector(buf, offset,  tcp_speed_target_);
 	}
 	offset += sizeof(double) * 6;
 	
 	memcpy(&digital_input_bits, &buf[offset], sizeof(digital_input_bits));
   unpackDigitalInputBits(be64toh(digital_input_bits), digital_input_bits_);
 	offset += sizeof(double);
-  unpackVector(buf, offset, 6, motor_temperatures_);
+  unpackVector(buf, offset,  motor_temperatures_);
 	offset += sizeof(double) * 6;
 	memcpy(&unpack_to, &buf[offset], sizeof(unpack_to));
 	controller_timer_ = ntohd(unpack_to);
@@ -399,7 +304,7 @@ void RobotStateRT::unpack(uint8_t * buf) {
 		robot_mode_ = ntohd(unpack_to);
 		if (version_ > 1.7) {
 			offset += sizeof(double);
-      unpackVector(buf, offset, 6, joint_modes_);
+      unpackVector(buf, offset,  joint_modes_);
 		}
 	}
 	if (version_ > 1.8) {
@@ -407,7 +312,7 @@ void RobotStateRT::unpack(uint8_t * buf) {
 		memcpy(&unpack_to, &buf[offset], sizeof(unpack_to));
 		safety_mode_ = ntohd(unpack_to);
 		offset += sizeof(double);
-    unpackVector(buf, offset, 3, tool_accelerometer_values_);
+    unpackVector(buf, offset, tool_accelerometer_values_);
 		offset += sizeof(double) * 3;
 		memcpy(&unpack_to, &buf[offset], sizeof(unpack_to));
 		speed_scaling_ = ntohd(unpack_to);
@@ -424,9 +329,9 @@ void RobotStateRT::unpack(uint8_t * buf) {
 		memcpy(&unpack_to, &buf[offset], sizeof(unpack_to));
 		i_robot_ = ntohd(unpack_to);
 		offset += sizeof(double);
-    unpackVector(buf, offset, 6, v_actual_);
+    unpackVector(buf, offset,  v_actual_);
 	}
-	val_lock_.unlock();
+
 	controller_updated_ = true;
 	data_published_ = true;
 	pMsg_cond_->notify_all();

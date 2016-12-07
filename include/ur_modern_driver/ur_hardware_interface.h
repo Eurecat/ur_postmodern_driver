@@ -116,13 +116,13 @@ protected:
 	bool position_interface_running_;
 	// Shared memory
 	std::vector<std::string> joint_names_;
-	std::vector<double> joint_position_;
-	std::vector<double> joint_velocity_;
-	std::vector<double> joint_effort_;
-	std::vector<double> joint_position_command_;
-	std::vector<double> joint_velocity_command_;
-	std::vector<double> prev_joint_velocity_command_;
-		std::size_t num_joints_;
+  Vector6 joint_position_;
+  Vector6 joint_velocity_;
+  Vector6 joint_effort_;
+  Vector6 joint_position_command_;
+  Vector6 joint_velocity_command_;
+  Vector6 prev_joint_velocity_command_;
+  enum{ NUM_JOINTS = 6};
 	double robot_force_[3] = { 0., 0., 0. };
 	double robot_torque_[3] = { 0., 0., 0. };
 

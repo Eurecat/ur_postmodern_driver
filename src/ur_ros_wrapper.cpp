@@ -224,8 +224,8 @@ public:
 	}
 private:
 	void trajThread(std::vector<double> timestamps,
-			std::vector<std::vector<double> > positions,
-			std::vector<std::vector<double> > velocities) {
+      std::vector<Vector6> positions,
+      std::vector<Vector6> velocities) {
 		
 		robot_.doTraj(timestamps, positions, velocities);
 		if (has_goal_) {
@@ -354,7 +354,7 @@ private:
 		}
 		
 		std::vector<double> timestamps;
-		std::vector<std::vector<double> > positions, velocities;
+    std::vector<Vector6> positions, velocities;
 		const int points_count = goal.trajectory.points.size();
 		timestamps.reserve(points_count+1);
 		positions.reserve(points_count+1);
@@ -372,8 +372,8 @@ private:
 		for (unsigned int i = 0; i < points_count; i++) {
 			timestamps.push_back(
 					goal.trajectory.points[i].time_from_start.toSec());
-			positions.push_back(goal.trajectory.points[i].positions);
-			velocities.push_back(goal.trajectory.points[i].velocities);
+      positions.push_back( toArray(goal.trajectory.points[i].positions) );
+      velocities.push_back( toArray(goal.trajectory.points[i].velocities) );
 		}
 		
 		goal_handle_.setAccepted();
@@ -516,7 +516,7 @@ private:
 	{
 		for (unsigned int i = 0; i < traj.points[0].positions.size(); i++)
 		{
-			std::vector<double> qActual = robot_.rt_interface_->robot_state_->getQActual();
+      Vector6 qActual = robot_.rt_interface_->robot_state_->getQActual();
 			if( fabs(traj.points[0].positions[i] - qActual[i]) > eps )
 			{
 				return false;
@@ -610,7 +610,7 @@ private:
 			hardware_interface_->write();
 			
 			// Tool vector: Actual Cartesian coordinates of the tool: (x,y,z,rx,ry,rz), where rx, ry and rz is a rotation vector representation of the tool orientation
-			std::vector<double> tool_vector_actual = robot_.rt_interface_->robot_state_->getToolVectorActual();
+      Vector6 tool_vector_actual = robot_.rt_interface_->robot_state_->getToolVectorActual();
 			
 			// Compute rotation angle
 			double rx = tool_vector_actual[3];
@@ -641,7 +641,7 @@ private:
 			}
 			
 			//Publish tool velocity
-			std::vector<double> tcp_speed = robot_.rt_interface_->robot_state_->getTcpSpeedActual();
+      Vector6 tcp_speed = robot_.rt_interface_->robot_state_->getTcpSpeedActual();
 			
 			if( tool_vel_pub.trylock() )
 			{
@@ -666,9 +666,10 @@ private:
 				"wrench", 1);
 		ros::Publisher tool_vel_pub = nh_.advertise<geometry_msgs::TwistStamped>("tool_velocity", 1);
 		static tf::TransformBroadcaster br;
-		while (ros::ok()) {
-			sensor_msgs::JointState joint_msg;
-			joint_msg.name = robot_.getJointNames();
+
+    sensor_msgs::JointState joint_msg;
+    joint_msg.name = robot_.getJointNames();
+    while (ros::ok()) {
 			geometry_msgs::WrenchStamped wrench_msg;
 			geometry_msgs::PoseStamped tool_pose_msg;
 			std::mutex msg_lock; // The values are locked for reading in the class, so just use a dummy mutex
@@ -677,17 +678,14 @@ private:
 				rt_msg_cond_.wait(locker);
 			}
 			joint_msg.header.stamp = ros::Time::now();
-			joint_msg.position =
-					robot_.rt_interface_->robot_state_->getQActual();
+      toVector(robot_.rt_interface_->robot_state_->getQActual(), joint_msg.position);
 			for (unsigned int i = 0; i < joint_msg.position.size(); i++) {
 				joint_msg.position[i] += joint_offsets_[i];
 			}
-			joint_msg.velocity =
-					robot_.rt_interface_->robot_state_->getQdActual();
-			joint_msg.effort = robot_.rt_interface_->robot_state_->getIActual();
+      toVector( robot_.rt_interface_->robot_state_->getQdActual(), joint_msg.velocity);
+      toVector( robot_.rt_interface_->robot_state_->getIActual(), joint_msg.effort);
 			joint_pub.publish(joint_msg);
-			std::vector<double> tcp_force =
-					robot_.rt_interface_->robot_state_->getTcpForce();
+      Vector6 tcp_force = robot_.rt_interface_->robot_state_->getTcpForce();
 			wrench_msg.header.stamp = joint_msg.header.stamp;
 			wrench_msg.wrench.force.x = tcp_force[0];
 			wrench_msg.wrench.force.y = tcp_force[1];
@@ -698,7 +696,7 @@ private:
 			wrench_pub.publish(wrench_msg);
 			
 			// Tool vector: Actual Cartesian coordinates of the tool: (x,y,z,rx,ry,rz), where rx, ry and rz is a rotation vector representation of the tool orientation
-			std::vector<double> tool_vector_actual = robot_.rt_interface_->robot_state_->getToolVectorActual();
+      Vector6 tool_vector_actual = robot_.rt_interface_->robot_state_->getToolVectorActual();
 			
 			//Create quaternion
 			tf::Quaternion quat;
@@ -719,8 +717,7 @@ private:
 			br.sendTransform(tf::StampedTransform(transform, joint_msg.header.stamp, base_frame_, tool_frame_));
 			
 			//Publish tool velocity
-			std::vector<double> tcp_speed =
-					robot_.rt_interface_->robot_state_->getTcpSpeedActual();
+      Vector6 tcp_speed = robot_.rt_interface_->robot_state_->getTcpSpeedActual();
 			geometry_msgs::TwistStamped tool_twist;
 			tool_twist.header.frame_id = base_frame_;
 			tool_twist.header.stamp = joint_msg.header.stamp;

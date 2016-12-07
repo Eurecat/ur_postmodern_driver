@@ -58,12 +58,12 @@ UrDriver::UrDriver(std::condition_variable& rt_msg_cond,
 	listen(incoming_sockfd_, 5);
 }
 
-std::vector<double> UrDriver::interp_cubic(double t, double T,
-    const std::vector<double> p0_pos, const std::vector<double> &p1_pos,
-    const std::vector<double> p0_vel, const std::vector<double> &p1_vel) const {
+Vector6 UrDriver::interp_cubic(double t, double T,
+    const Vector6& p0_pos, const Vector6& p1_pos,
+    const Vector6& p0_vel, const Vector6& p1_vel) {
 	/*Returns positions of the joints at time 't' */
-  std::vector<double> positions(p0_pos.size());
-	for (unsigned int i = 0; i < p0_pos.size(); i++) {
+  Vector6 positions;
+  for (unsigned int i = 0; i < 6; i++) {
 		double a = p0_pos[i];
 		double b = p0_vel[i];
 		double c = (-3 * p0_pos[i] + 3 * p1_pos[i] - 2 * T * p0_vel[i]
@@ -76,10 +76,10 @@ std::vector<double> UrDriver::interp_cubic(double t, double T,
 }
 
 bool UrDriver::doTraj(const std::vector<double> &inp_timestamps,
-    const std::vector<std::vector<double> > &inp_positions,
-    const std::vector<std::vector<double> > &inp_velocities) {
+    const std::vector<Vector6> &inp_positions,
+    const std::vector<Vector6> &inp_velocities) {
 	std::chrono::high_resolution_clock::time_point t0, t;
-	std::vector<double> positions;
+  Vector6 positions;
 	unsigned int j;
 
 	if (!UrDriver::uploadProg()) {
@@ -100,8 +100,11 @@ bool UrDriver::doTraj(const std::vector<double> &inp_timestamps,
 		positions = UrDriver::interp_cubic(
 				std::chrono::duration_cast<std::chrono::duration<double>>(
 						t - t0).count() - inp_timestamps[j - 1],
-				inp_timestamps[j] - inp_timestamps[j - 1], inp_positions[j - 1],
-				inp_positions[j], inp_velocities[j - 1], inp_velocities[j]);
+        inp_timestamps[j] - inp_timestamps[j - 1],
+        inp_positions[j - 1],
+        inp_positions[j],
+        inp_velocities[j - 1],
+        inp_velocities[j]);
 		UrDriver::servoj(positions);
 
 		// oversample with 4 * sample_time
@@ -115,7 +118,7 @@ bool UrDriver::doTraj(const std::vector<double> &inp_timestamps,
 	return true;
 }
 
-void UrDriver::servoj(const std::vector<double>& positions, int keepalive) {
+void UrDriver::servoj(const Vector6 &positions, int keepalive) {
 	if (!reverse_connected_) {
 		print_error(
 				"UrDriver::servoj called without a reverse connection present. Keepalive: "
@@ -235,14 +238,14 @@ bool UrDriver::openServo() {
 	reverse_connected_ = true;
 	return true;
 }
-void UrDriver::closeServo(const std::vector<double>& positions) {
-	if (positions.size() != 6)
-		UrDriver::servoj(rt_interface_->robot_state_->getQActual(), 0);
-	else
-		UrDriver::servoj(positions, 0);
-
+void UrDriver::closeServo(const Vector6& positions) {
+  UrDriver::servoj(positions, 0);
 	reverse_connected_ = false;
 	close(new_sockfd_);
+}
+
+void UrDriver::closeServo() {
+  closeServo(rt_interface_->robot_state_->getQActual());
 }
 
 bool UrDriver::start() {
