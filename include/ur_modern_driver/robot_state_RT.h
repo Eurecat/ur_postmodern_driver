@@ -35,7 +35,7 @@ inline Vector6 toArray(const std::vector<double>& src){
   return { src[0], src[1],  src[2], src[3], src[4], src[5] };
 }
 
-inline void toVector(const Vector6 src, std::vector<double>& dst){
+inline void toVector(const Vector6& src, std::vector<double>& dst){
   dst.resize(6);
   for (int i=0; i<6; i++) dst[i] = src[i];
 }
