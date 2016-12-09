@@ -78,7 +78,7 @@ Vector6 UrDriver::interp_cubic(double t, double T,
 bool UrDriver::doTraj(const std::vector<double> &inp_timestamps,
     const std::vector<Vector6> &inp_positions,
     const std::vector<Vector6> &inp_velocities) {
-	std::chrono::high_resolution_clock::time_point t0, t;
+  std::chrono::high_resolution_clock::time_point t0;
   Vector6 positions;
 	unsigned int j;
 
@@ -87,19 +87,16 @@ bool UrDriver::doTraj(const std::vector<double> &inp_timestamps,
 	}
 	executing_traj_ = true;
 	t0 = std::chrono::high_resolution_clock::now();
-	t = t0;
 	j = 0;
+  double elapsed_time = 0.0;
+
 	while ((inp_timestamps[inp_timestamps.size() - 1]
-			>= std::chrono::duration_cast<std::chrono::duration<double>>(t - t0).count())
+      >= elapsed_time)
 			and executing_traj_) {
-		while (inp_timestamps[j]
-				<= std::chrono::duration_cast<std::chrono::duration<double>>(
-						t - t0).count() && j < inp_timestamps.size() - 1) {
+    while (inp_timestamps[j] <= elapsed_time && j < inp_timestamps.size() - 1) {
 			j += 1;
 		}
-		positions = UrDriver::interp_cubic(
-				std::chrono::duration_cast<std::chrono::duration<double>>(
-						t - t0).count() - inp_timestamps[j - 1],
+    positions = UrDriver::interp_cubic(elapsed_time - inp_timestamps[j - 1],
         inp_timestamps[j] - inp_timestamps[j - 1],
         inp_positions[j - 1],
         inp_positions[j],
@@ -110,7 +107,8 @@ bool UrDriver::doTraj(const std::vector<double> &inp_timestamps,
 		// oversample with 4 * sample_time
 		std::this_thread::sleep_for(
 				std::chrono::milliseconds((int) ((servoj_time_ * 1000) / 4.)));
-		t = std::chrono::high_resolution_clock::now();
+    const auto t = std::chrono::high_resolution_clock::now();
+    elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(t - t0).count();
 	}
 	executing_traj_ = false;
 	//Signal robot to stop driverProg()
