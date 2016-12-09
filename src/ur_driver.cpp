@@ -251,10 +251,6 @@ void UrDriver::closeServo() {
   close(new_sockfd_);
 }
 
-void UrDriver::closeServo() {
-  closeServo(rt_interface_->robot_state_->getQActual());
-}
-
 bool UrDriver::start() {
 	if (!sec_interface_->start())
 		return false;
