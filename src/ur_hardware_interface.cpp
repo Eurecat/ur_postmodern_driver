@@ -143,9 +143,8 @@ void UrHardwareInterface::setMaxVelChange(double inp) {
 
 void UrHardwareInterface::write() {
 	if (velocity_interface_running_) {
-		std::vector<double> cmd;
+    Vector6 cmd;
 		//do some rate limiting
-		cmd.resize(joint_velocity_command_.size());
 		for (unsigned int i = 0; i < joint_velocity_command_.size(); i++) {
       const double upper_bound = prev_joint_velocity_command_[i] + max_vel_change_;
       const double lower_bound = prev_joint_velocity_command_[i] - max_vel_change_;
