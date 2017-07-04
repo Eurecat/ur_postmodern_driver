@@ -26,6 +26,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <vector>
+#include "ur_driver_common.h"
 
 namespace message_types {
 enum message_type { ROBOT_STATE = 16, ROBOT_MESSAGE = 20, PROGRAM_STATE_MESSAGE = 25 };
@@ -108,25 +109,25 @@ struct version_message {
 };
 
 struct masterboard_data {
-	int digitalInputBits;
-	int digitalOutputBits;
-	char analogInputRange0;
-	char analogInputRange1;
+	int32_t digitalInputBits;
+	int32_t digitalOutputBits;
+	int8_t analogInputRange0;
+	int8_t analogInputRange1;
 	double analogInput0;
 	double analogInput1;
-	char analogOutputDomain0;
-	char analogOutputDomain1;
+	int8_t analogOutputDomain0;
+	int8_t analogOutputDomain1;
 	double analogOutput0;
 	double analogOutput1;
 	float masterBoardTemperature;
 	float robotVoltage48V;
 	float robotCurrent;
 	float masterIOCurrent;
-	unsigned char safetyMode;
-	unsigned char masterOnOffState;
-	char euromap67InterfaceInstalled;
-	int euromapInputBits;
-	int euromapOutputBits;
+	uint8_t safetyMode;
+	uint8_t masterOnOffState;
+	int8_t euromap67InterfaceInstalled;
+	int32_t euromapInputBits;
+	int32_t euromapOutputBits;
 	float euromapVoltage;
 	float euromapCurrent;
 };
@@ -140,8 +141,8 @@ struct robot_mode_data {
 	bool isProtectiveStopped;
 	bool isProgramRunning;
 	bool isProgramPaused;
-	unsigned char robotMode;
-	unsigned char controlMode;
+	uint8_t robotMode;
+	uint8_t controlMode;
 	double targetSpeedFraction;
 	double speedScaling;
 };
@@ -158,14 +159,12 @@ class RobotState {
 	bool new_data_available_;             // to avoid spurious wakes
 	unsigned char robot_mode_running_;
 
-	double ntohd(uint64_t nf);
-
   public:
 	RobotState(std::condition_variable& msg_cond);
 	~RobotState();
 	double getVersion();
 	double getTime();
-	std::vector<double> getQTarget();
+	Vector6 getQTarget();
 	int getDigitalInputBits();
 	int getDigitalOutputBits();
 	char getAnalogInputRange0();
@@ -176,7 +175,7 @@ class RobotState {
 	char getAnalogOutputDomain1();
 	double getAnalogOutput0();
 	double getAnalogOutput1();
-	std::vector<double> getVActual();
+	Vector6 getVActual();
 	float getMasterBoardTemperature();
 	float getRobotVoltage48V();
 	float getRobotCurrent();
@@ -205,9 +204,9 @@ class RobotState {
 	void finishedReading();
 
 	void unpack(uint8_t* buf, unsigned int buf_length);
-	void unpackRobotMessage(uint8_t* buf, unsigned int offset, uint32_t len);
+	void unpackRobotMessage(uint8_t* buf, unsigned int offset, unsigned int len);
 	void unpackRobotMessageVersion(uint8_t* buf, unsigned int offset, uint32_t len);
-	void unpackRobotState(uint8_t* buf, unsigned int offset, uint32_t len);
+	void unpackRobotState(uint8_t* buf, unsigned int offset, unsigned int len);
 	void unpackRobotStateMasterboard(uint8_t* buf, unsigned int offset);
 	void unpackRobotMode(uint8_t* buf, unsigned int offset);
 };

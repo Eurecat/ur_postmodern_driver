@@ -70,7 +70,6 @@
 #include "ur_driver.h"
 
 namespace ros_control_ur {
-
 // For simulation only - determines how fast a trajectory is followed
 static const double POSITION_STEP_FACTOR = 1;
 static const double VELOCITY_STEP_FACTOR = 1;
@@ -113,12 +112,12 @@ class UrHardwareInterface : public hardware_interface::RobotHW {
 	bool position_interface_running_;
 	// Shared memory
 	std::vector<std::string> joint_names_;
-	std::vector<double> joint_position_;
-	std::vector<double> joint_velocity_;
-	std::vector<double> joint_effort_;
-	std::vector<double> joint_position_command_;
-	std::vector<double> joint_velocity_command_;
-	std::vector<double> prev_joint_velocity_command_;
+	Vector6 joint_position_;
+	Vector6 joint_velocity_;
+	Vector6 joint_effort_;
+	Vector6 joint_position_command_;
+	Vector6 joint_velocity_command_;
+	Vector6 prev_joint_velocity_command_;
 	std::size_t num_joints_;
 	double robot_force_[3] = { 0., 0., 0. };
 	double robot_torque_[3] = { 0., 0., 0. };

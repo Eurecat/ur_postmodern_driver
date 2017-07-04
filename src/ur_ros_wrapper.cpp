@@ -32,6 +32,8 @@
 #include <controller_manager/controller_manager.h>
 #include <realtime_tools/realtime_publisher.h>
 #include <ros/console.h>
+#include <sched.h>
+#include <sys/mman.h>
 #include "actionlib/server/action_server.h"
 #include "actionlib/server/server_goal_handle.h"
 #include "control_msgs/FollowJointTrajectoryAction.h"
@@ -50,7 +52,6 @@
 #include "ur_msgs/SetPayload.h"
 #include "ur_msgs/SetPayloadRequest.h"
 #include "ur_msgs/SetPayloadResponse.h"
-
 /// TF
 #include <tf/tf.h>
 #include <tf/transform_broadcaster.h>
@@ -125,8 +126,7 @@ class RosWrapper {
 			hardware_interface_->setMaxVelChange(max_vel_change);
 		}
 		// Using a very high value in order to not limit execution of trajectories being
-		// sent from
-		// MoveIt!
+		// sent from MoveIt!
 		max_velocity_ = 10.;
 		if (ros::param::get("~max_velocity", max_velocity_)) {
 			sprintf(buf, "Max velocity accepted by ur_driver: %f [rad/s]", max_velocity_);
@@ -219,9 +219,32 @@ class RosWrapper {
 	}
 
   private:
-	void trajThread(std::vector<double> timestamps,
-	                std::vector<std::vector<double> > positions,
-	                std::vector<std::vector<double> > velocities) {
+	void trajThread(const std::vector<double>& timestamps,
+	                const std::vector<Vector6>& positions,
+	                const std::vector<Vector6>& velocities) {
+		//--------------------------------
+		struct sched_param param;
+
+		static bool first_warning = true;
+
+		param.sched_priority = 40;
+		if (sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
+			if (first_warning) {
+				print_info("sched_setscheduler failed. Either you don't have RT_PREEMPT "
+				           "installed of you should use sudo");
+				first_warning = false;
+			}
+		} else {
+			if (mlockall(MCL_CURRENT | MCL_FUTURE) == -1) {
+				print_info("mlockall failed");
+			} else {
+				const size_t MAX_SAFE_STACK = 1024 * 64;
+				unsigned char dummy[MAX_SAFE_STACK];
+				memset(dummy, 0, MAX_SAFE_STACK);
+			}
+		}
+		//--------------------------------
+
 		robot_.doTraj(timestamps, positions, velocities);
 		if (has_goal_) {
 			result_.error_code = result_.SUCCESSFUL;
@@ -237,9 +260,8 @@ class RosWrapper {
 			result_.error_code = -100;  // nothing is defined for this...?
 
 			if (!robot_.sec_interface_->robot_state_->isPowerOnRobot()) {
-				result_.error_string =
-				    "Cannot accept new trajectories: Robot arm is not powered "
-				    "on";
+				result_.error_string = "Cannot accept new trajectories: Robot arm is not "
+				                       "powered on";
 				gh.setRejected(result_, result_.error_string);
 				print_error(result_.error_string);
 				return;
@@ -278,9 +300,8 @@ class RosWrapper {
 		actionlib::ActionServer<control_msgs::FollowJointTrajectoryAction>::Goal goal =
 		    *gh.getGoal();  // make a copy that we can modify
 		if (has_goal_) {
-			print_warning(
-			    "Received new goal while still executing previous trajectory. Canceling "
-			    "previous trajectory");
+			print_warning("Received new goal while still executing previous trajectory. "
+			              "Canceling previous trajectory");
 			has_goal_ = false;
 			robot_.stopTraj();
 			result_.error_code = -100;  // nothing is defined for this...?
@@ -346,19 +367,25 @@ class RosWrapper {
 		}
 
 		std::vector<double> timestamps;
-		std::vector<std::vector<double> > positions, velocities;
+		std::vector<Vector6> positions, velocities;
+		timestamps.reserve(goal.trajectory.points.size() + 1);
+		positions.reserve(goal.trajectory.points.size() + 1);
+		velocities.reserve(goal.trajectory.points.size() + 1);
+
 		if (goal.trajectory.points[0].time_from_start.toSec() != 0.) {
+			const auto& robot_state = robot_.rt_interface_->robot_state_;
 			print_warning("Trajectory's first point should be the current position, with "
 			              "time_from_start set to 0.0 - "
 			              "Inserting point in malformed trajectory");
 			timestamps.push_back(0.0);
-			positions.push_back(robot_.rt_interface_->robot_state_->getQActual());
-			velocities.push_back(robot_.rt_interface_->robot_state_->getQdActual());
+			positions.push_back(robot_state->getQActual());
+			velocities.push_back(robot_state->getQdActual());
 		}
 		for (unsigned int i = 0; i < goal.trajectory.points.size(); i++) {
-			timestamps.push_back(goal.trajectory.points[i].time_from_start.toSec());
-			positions.push_back(goal.trajectory.points[i].positions);
-			velocities.push_back(goal.trajectory.points[i].velocities);
+			const auto& trajectory_point = goal.trajectory.points[i];
+			timestamps.push_back(trajectory_point.time_from_start.toSec());
+			positions.push_back(ToVector6(trajectory_point.positions));
+			velocities.push_back(ToVector6(trajectory_point.velocities));
 		}
 
 		goal_handle_.setAccepted();
@@ -490,8 +517,7 @@ class RosWrapper {
 
 	bool start_positions_match(const trajectory_msgs::JointTrajectory& traj, double eps) {
 		for (unsigned int i = 0; i < traj.points[0].positions.size(); i++) {
-			std::vector<double> qActual =
-			    robot_.rt_interface_->robot_state_->getQActual();
+			Vector6 qActual = robot_.rt_interface_->robot_state_->getQActual();
 			if (fabs(traj.points[0].positions[i] - qActual[i]) > eps) {
 				return false;
 			}
@@ -530,13 +556,13 @@ class RosWrapper {
 	void speedInterface(const trajectory_msgs::JointTrajectory::Ptr& msg) {
 		if (msg->points[0].velocities.size() == 6) {
 			double acc = 100;
-			if (msg->points[0].accelerations.size() > 0)
-				acc = *std::max_element(msg->points[0].accelerations.begin(),
-				                        msg->points[0].accelerations.end());
-			robot_.setSpeed(msg->points[0].velocities[0], msg->points[0].velocities[1],
-			                msg->points[0].velocities[2], msg->points[0].velocities[3],
-			                msg->points[0].velocities[4], msg->points[0].velocities[5],
-			                acc);
+			const auto& point = msg->points[0];
+			if (point.accelerations.size() > 0)
+				acc = *std::max_element(point.accelerations.begin(),
+				                        point.accelerations.end());
+
+			Vector6 joint_velocities = ToVector6(point.velocities);
+			robot_.setSpeed(joint_velocities, acc);
 		}
 	}
 	void urscriptInterface(const std_msgs::String::ConstPtr& msg) {
@@ -558,18 +584,19 @@ class RosWrapper {
 		    nh_, "tool_velocity", 1);
 		tool_vel_pub.msg_.header.frame_id = base_frame_;
 
+		const auto& robot_state = robot_.rt_interface_->robot_state_;
+
 		clock_gettime(CLOCK_MONOTONIC, &last_time);
 		while (ros::ok()) {
 			std::mutex msg_lock;  // The values are locked for reading in the class, so
-			                      // just use a
-			                      // dummy mutex
+			                      // just use a dummy mutex
 			std::unique_lock<std::mutex> locker(msg_lock);
-			while (!robot_.rt_interface_->robot_state_->getControllerUpdated()) {
+			while (!robot_state->getControllerUpdated()) {
 				rt_msg_cond_.wait(locker);
 			}
 			// Input
 			hardware_interface_->read();
-			robot_.rt_interface_->robot_state_->setControllerUpdated();
+			robot_state->setControllerUpdated();
 
 			// Control
 			clock_gettime(CLOCK_MONOTONIC, &current_time);
@@ -584,11 +611,9 @@ class RosWrapper {
 			hardware_interface_->write();
 
 			// Tool vector: Actual Cartesian coordinates of the tool: (x,y,z,rx,ry,rz),
-			// where rx, ry
-			// and rz is a
-			// rotation vector representation of the tool orientation
-			std::vector<double> tool_vector_actual =
-			    robot_.rt_interface_->robot_state_->getToolVectorActual();
+			// where rx, ry and rz is a rotation
+			// vector representation of the tool orientation
+			Vector6 tool_vector_actual = robot_state->getToolVectorActual();
 
 			// Compute rotation angle
 			double rx = tool_vector_actual[3];
@@ -598,32 +623,28 @@ class RosWrapper {
 
 			// Broadcast transform
 			if (tf_pub.trylock()) {
+				auto& transform = tf_pub.msg_.transforms[0].transform;
 				tf_pub.msg_.transforms[0].header.stamp = ros_time;
 				if (angle < 1e-16) {
-					tf_pub.msg_.transforms[0].transform.rotation.x = 0;
-					tf_pub.msg_.transforms[0].transform.rotation.y = 0;
-					tf_pub.msg_.transforms[0].transform.rotation.z = 0;
-					tf_pub.msg_.transforms[0].transform.rotation.w = 1;
+					transform.rotation.x = 0;
+					transform.rotation.y = 0;
+					transform.rotation.z = 0;
+					transform.rotation.w = 1;
 				} else {
-					tf_pub.msg_.transforms[0].transform.rotation.x =
-					    (rx / angle) * std::sin(angle * 0.5);
-					tf_pub.msg_.transforms[0].transform.rotation.y =
-					    (ry / angle) * std::sin(angle * 0.5);
-					tf_pub.msg_.transforms[0].transform.rotation.z =
-					    (rz / angle) * std::sin(angle * 0.5);
-					tf_pub.msg_.transforms[0].transform.rotation.w =
-					    std::cos(angle * 0.5);
+					transform.rotation.x = (rx / angle) * std::sin(angle * 0.5);
+					transform.rotation.y = (ry / angle) * std::sin(angle * 0.5);
+					transform.rotation.z = (rz / angle) * std::sin(angle * 0.5);
+					transform.rotation.w = std::cos(angle * 0.5);
 				}
-				tf_pub.msg_.transforms[0].transform.translation.x = tool_vector_actual[0];
-				tf_pub.msg_.transforms[0].transform.translation.y = tool_vector_actual[1];
-				tf_pub.msg_.transforms[0].transform.translation.z = tool_vector_actual[2];
+				transform.translation.x = tool_vector_actual[0];
+				transform.translation.y = tool_vector_actual[1];
+				transform.translation.z = tool_vector_actual[2];
 
 				tf_pub.unlockAndPublish();
 			}
 
 			// Publish tool velocity
-			std::vector<double> tcp_speed =
-			    robot_.rt_interface_->robot_state_->getTcpSpeedActual();
+			Vector6 tcp_speed = robot_state->getTcpSpeedActual();
 
 			if (tool_vel_pub.trylock()) {
 				tool_vel_pub.msg_.header.stamp = ros_time;
@@ -653,22 +674,23 @@ class RosWrapper {
 			geometry_msgs::WrenchStamped wrench_msg;
 			geometry_msgs::PoseStamped tool_pose_msg;
 			std::mutex msg_lock;  // The values are locked for reading in the class, so
-			                      // just use a
-			                      // dummy mutex
+			                      // just use a dummy mutex
 			std::unique_lock<std::mutex> locker(msg_lock);
-			while (!robot_.rt_interface_->robot_state_->getDataPublished()) {
+			const auto& robot_state = robot_.rt_interface_->robot_state_;
+
+			while (!robot_state->getDataPublished()) {
 				rt_msg_cond_.wait(locker);
 			}
+
 			joint_msg.header.stamp = ros::Time::now();
-			joint_msg.position = robot_.rt_interface_->robot_state_->getQActual();
+			joint_msg.position = ToStdVector(robot_state->getQActual());
 			for (unsigned int i = 0; i < joint_msg.position.size(); i++) {
 				joint_msg.position[i] += joint_offsets_[i];
 			}
-			joint_msg.velocity = robot_.rt_interface_->robot_state_->getQdActual();
-			joint_msg.effort = robot_.rt_interface_->robot_state_->getIActual();
+			joint_msg.velocity = ToStdVector(robot_state->getQdActual());
+			joint_msg.effort = ToStdVector(robot_state->getIActual());
 			joint_pub.publish(joint_msg);
-			std::vector<double> tcp_force =
-			    robot_.rt_interface_->robot_state_->getTcpForce();
+			Vector6 tcp_force = robot_state->getTcpForce();
 			wrench_msg.header.stamp = joint_msg.header.stamp;
 			wrench_msg.wrench.force.x = tcp_force[0];
 			wrench_msg.wrench.force.y = tcp_force[1];
@@ -679,11 +701,9 @@ class RosWrapper {
 			wrench_pub.publish(wrench_msg);
 
 			// Tool vector: Actual Cartesian coordinates of the tool: (x,y,z,rx,ry,rz),
-			// where rx, ry
-			// and rz is a
-			// rotation vector representation of the tool orientation
-			std::vector<double> tool_vector_actual =
-			    robot_.rt_interface_->robot_state_->getToolVectorActual();
+			// where rx, ry and rz is a rotation
+			// vector representation of the tool orientation
+			Vector6 tool_vector_actual = robot_state->getToolVectorActual();
 
 			// Create quaternion
 			tf::Quaternion quat;
@@ -698,16 +718,15 @@ class RosWrapper {
 			}
 
 			// Create and broadcast transform
-			tf::Transform transform;
-			transform.setOrigin(tf::Vector3(tool_vector_actual[0], tool_vector_actual[1],
-			                                tool_vector_actual[2]));
-			transform.setRotation(quat);
-			br.sendTransform(tf::StampedTransform(transform, joint_msg.header.stamp,
-			                                      base_frame_, tool_frame_));
+			//      tf::Transform transform;
+			//      transform.setOrigin(tf::Vector3(tool_vector_actual[0],
+			//      tool_vector_actual[1], tool_vector_actual[2]));
+			//      transform.setRotation(quat);
+			//      br.sendTransform(tf::StampedTransform(transform,
+			//      joint_msg.header.stamp, base_frame_, tool_frame_));
 
 			// Publish tool velocity
-			std::vector<double> tcp_speed =
-			    robot_.rt_interface_->robot_state_->getTcpSpeedActual();
+			Vector6 tcp_speed = robot_state->getTcpSpeedActual();
 			geometry_msgs::TwistStamped tool_twist;
 			tool_twist.header.frame_id = base_frame_;
 			tool_twist.header.stamp = joint_msg.header.stamp;
@@ -719,7 +738,7 @@ class RosWrapper {
 			tool_twist.twist.angular.z = tcp_speed[5];
 			tool_vel_pub.publish(tool_twist);
 
-			robot_.rt_interface_->robot_state_->setDataPublished();
+			robot_state->setDataPublished();
 		}
 	}
 
@@ -731,8 +750,7 @@ class RosWrapper {
 		while (ros::ok()) {
 			ur_msgs::IOStates io_msg;
 			std::mutex msg_lock;  // The values are locked for reading in the class, so
-			                      // just use a
-			                      // dummy mutex
+			                      // just use a dummy mutex
 			std::unique_lock<std::mutex> locker(msg_lock);
 			while (!robot_.sec_interface_->robot_state_->getNewDataAvailable()) {
 				msg_cond_.wait(locker);
@@ -808,25 +826,21 @@ int main(int argc, char** argv) {
 	}
 	if (!(ros::param::get("~robot_ip_address", host))) {
 		if (argc > 1) {
-			print_warning(
-			    "Please set the parameter robot_ip_address instead of giving it as a "
-			    "command line argument. "
-			    "This method is DEPRECATED");
+			print_warning("Please set the parameter robot_ip_address instead of giving "
+			              "it as a command line argument. This "
+			              "method is DEPRECATED");
 			host = argv[1];
 		} else {
 			print_fatal("Could not get robot ip. Please supply it as command line "
-			            "parameter or on "
-			            "the parameter server "
-			            "as robot_ip");
+			            "parameter or on the parameter server as "
+			            "robot_ip");
 			exit(1);
 		}
 	}
 	if ((ros::param::get("~reverse_port", reverse_port))) {
 		if ((reverse_port <= 0) or (reverse_port >= 65535)) {
-			print_warning(
-			    "Reverse port value is not valid (Use number between 1 and 65534. Using "
-			    "default value of "
-			    "50001");
+			print_warning("Reverse port value is not valid (Use number between 1 and "
+			              "65534. Using default value of 50001");
 			reverse_port = 50001;
 		}
 	} else

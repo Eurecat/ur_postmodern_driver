@@ -65,27 +65,25 @@ class UrDriver {
 	bool start();
 	void halt();
 
-	void setSpeed(double q0, double q1, double q2, double q3, double q4, double q5,
-	              double acc = 100.);
+	void setSpeed(const Vector6& velocities, double acc = 100.);
 
-	bool doTraj(std::vector<double> inp_timestamps,
-	            std::vector<std::vector<double> > inp_positions,
-	            std::vector<std::vector<double> > inp_velocities);
-	void servoj(std::vector<double> positions, int keepalive = 1);
+	bool doTraj(const std::vector<double>& inp_timestamps,
+	            const std::vector<Vector6>& inp_positions,
+	            const std::vector<Vector6>& inp_velocities);
+	void servoj(const Vector6& positions, int keepalive = 1);
 
 	void stopTraj();
 
 	bool uploadProg();
 	bool openServo();
-	void closeServo(std::vector<double> positions);
+	void closeServo(const Vector6& positions);
+	void closeServo();
 
-	std::vector<double> interp_cubic(double t, double T, std::vector<double> p0_pos,
-	                                 std::vector<double> p1_pos,
-	                                 std::vector<double> p0_vel,
-	                                 std::vector<double> p1_vel);
+	Vector6 interp_cubic(double t, double T, const Vector6& p0_pos, const Vector6& p1_pos,
+	                     const Vector6& p0_vel, const Vector6& p1_vel);
 
-	std::vector<std::string> getJointNames();
-	void setJointNames(std::vector<std::string> jn);
+	const std::vector<std::string>& getJointNames();
+	void setJointNames(const std::vector<std::string>& jn);
 	void setToolVoltage(unsigned int v);
 	void setFlag(unsigned int n, bool b);
 	void setDigitalOut(unsigned int n, bool b);

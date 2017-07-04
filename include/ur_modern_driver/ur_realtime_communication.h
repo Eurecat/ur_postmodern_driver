@@ -64,8 +64,7 @@ class UrRealtimeCommunication {
 	                        unsigned int safety_count_max = 12);
 	bool start();
 	void halt();
-	void setSpeed(double q0, double q1, double q2, double q3, double q4, double q5,
-	              double acc = 100.);
+	void setSpeed(const Vector6& velocities, double acc = 100.);
 	void addCommandToQueue(std::string inp);
 	void setSafetyCountMax(uint inp);
 	std::string getLocalIp();

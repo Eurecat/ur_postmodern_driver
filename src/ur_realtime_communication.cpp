@@ -90,32 +90,34 @@ void UrRealtimeCommunication::addCommandToQueue(std::string inp) {
 	if (inp.back() != '\n') {
 		inp.append("\n");
 	}
-	if (connected_)
+	if (connected_) {
 		bytes_written = write(sockfd_, inp.c_str(), inp.length());
-	else
-		print_error("Could not send command \"" + inp +
-		            "\". The robot is not connected! Command "
-		            "is discarded");
+	} else
+		print_error("Could not send command \"" + inp + "\". The robot is not connected! "
+		                                                "Command is discarded");
 }
 
-void UrRealtimeCommunication::setSpeed(double q0, double q1, double q2, double q3,
-                                       double q4, double q5, double acc) {
+void UrRealtimeCommunication::setSpeed(const Vector6 &vel, double acc) {
 	char cmd[1024];
 	if (robot_state_->getVersion() >= 3.3) {
 		sprintf(cmd, "speedj([%1.5f, %1.5f, %1.5f, %1.5f, %1.5f, %1.5f], %f, 0.008)\n",
-		        q0, q1, q2, q3, q4, q5, acc);
+		        vel[0], vel[1], vel[2], vel[3], vel[4], vel[5], acc);
 	} else if (robot_state_->getVersion() >= 3.1) {
-		sprintf(cmd, "speedj([%1.5f, %1.5f, %1.5f, %1.5f, %1.5f, %1.5f], %f)\n", q0, q1,
-		        q2, q3, q4, q5, acc);
+		sprintf(cmd, "speedj([%1.5f, %1.5f, %1.5f, %1.5f, %1.5f, %1.5f], %f)\n", vel[0],
+		        vel[1], vel[2], vel[3], vel[4], vel[5], acc);
 	} else {
-		sprintf(cmd, "speedj([%1.5f, %1.5f, %1.5f, %1.5f, %1.5f, %1.5f], %f, 0.02)\n", q0,
-		        q1, q2, q3, q4, q5, acc);
+		sprintf(cmd, "speedj([%1.5f, %1.5f, %1.5f, %1.5f, %1.5f, %1.5f], %f, 0.02)\n",
+		        vel[0], vel[1], vel[2], vel[3], vel[4], vel[5], acc);
 	}
 	addCommandToQueue((std::string)(cmd));
-	if (q0 != 0. or q1 != 0. or q2 != 0. or q3 != 0. or q4 != 0. or q5 != 0.) {
+
+	for (double q : vel) {
 		// If a joint speed is set, make sure we stop it again after some time if the user
 		// doesn't
-		safety_count_ = 0;
+		if (q != 0.) {
+			safety_count_ = 0;
+			break;
+		}
 	}
 }
 
@@ -140,7 +142,7 @@ void UrRealtimeCommunication::run() {
 				           sizeof(int));
 				robot_state_->unpack(buf);
 				if (safety_count_ == safety_count_max_) {
-					setSpeed(0., 0., 0., 0., 0., 0.);
+					setSpeed(ZERO_VELOCITY);
 				}
 				safety_count_ += 1;
 			} else {
@@ -151,8 +153,7 @@ void UrRealtimeCommunication::run() {
 		if (keepalive_) {
 			// reconnect
 			print_warning("Realtime port: No connection. Is controller crashed? Will try "
-			              "to reconnect in 10 "
-			              "seconds...");
+			              "to reconnect in 10 seconds...");
 			sockfd_ = socket(AF_INET, SOCK_STREAM, 0);
 			if (sockfd_ < 0) {
 				print_fatal("ERROR opening socket");
@@ -175,9 +176,8 @@ void UrRealtimeCommunication::run() {
 				getsockopt(sockfd_, SOL_SOCKET, SO_ERROR, &flag_, &flag_len);
 				if (flag_ < 0) {
 					print_error("Error re-connecting to RT port 30003. Is controller "
-					            "started? Will "
-					            "try to reconnect in "
-					            "10 seconds...");
+					            "started? Will try to reconnect in 10 "
+					            "seconds...");
 				} else {
 					connected_ = true;
 					print_info("Realtime port: Reconnected");
@@ -185,7 +185,7 @@ void UrRealtimeCommunication::run() {
 			}
 		}
 	}
-	setSpeed(0., 0., 0., 0., 0., 0.);
+	setSpeed(ZERO_VELOCITY);
 	close(sockfd_);
 }
 

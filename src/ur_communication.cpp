@@ -132,8 +132,7 @@ void UrCommunication::run() {
 		if (keepalive_) {
 			// reconnect
 			print_warning("Secondary port: No connection. Is controller crashed? Will "
-			              "try to reconnect in 10 "
-			              "seconds...");
+			              "try to reconnect in 10 seconds...");
 			sec_sockfd_ = socket(AF_INET, SOCK_STREAM, 0);
 			if (sec_sockfd_ < 0) {
 				print_fatal("ERROR opening secondary socket");
@@ -158,10 +157,9 @@ void UrCommunication::run() {
 				unsigned int flag_len;
 				getsockopt(sec_sockfd_, SOL_SOCKET, SO_ERROR, &flag_, &flag_len);
 				if (flag_ < 0) {
-					print_error(
-					    "Error re-connecting to port 30002. Is controller started? Will "
-					    "try to reconnect in 10 "
-					    "seconds...");
+					print_error("Error re-connecting to port 30002. Is controller "
+					            "started? Will try to reconnect in 10 "
+					            "seconds...");
 				} else {
 					connected_ = true;
 					print_info("Secondary port: Reconnected");
