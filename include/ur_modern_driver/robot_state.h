@@ -20,17 +20,15 @@
 #define ROBOT_STATE_H_
 
 #include <inttypes.h>
-#include <vector>
+#include <netinet/in.h>
 #include <stdlib.h>
 #include <string.h>
-#include <mutex>
 #include <condition_variable>
-#include <netinet/in.h>
+#include <mutex>
+#include <vector>
 
 namespace message_types {
-enum message_type {
-	ROBOT_STATE = 16, ROBOT_MESSAGE = 20, PROGRAM_STATE_MESSAGE = 25
-};
+enum message_type { ROBOT_STATE = 16, ROBOT_MESSAGE = 20, PROGRAM_STATE_MESSAGE = 25 };
 }
 typedef message_types::message_type messageType;
 
@@ -149,20 +147,20 @@ struct robot_mode_data {
 };
 
 class RobotState {
-private:
+  private:
 	version_message version_msg_;
 	masterboard_data mb_data_;
 	robot_mode_data robot_mode_;
 
-	std::recursive_mutex val_lock_; // Locks the variables while unpack parses data;
+	std::recursive_mutex val_lock_;  // Locks the variables while unpack parses data;
 
-	std::condition_variable* pMsg_cond_; //Signals that new vars are available
-	bool new_data_available_; //to avoid spurious wakes
+	std::condition_variable* pMsg_cond_;  // Signals that new vars are available
+	bool new_data_available_;             // to avoid spurious wakes
 	unsigned char robot_mode_running_;
 
 	double ntohd(uint64_t nf);
 
-public:
+  public:
 	RobotState(std::condition_variable& msg_cond);
 	~RobotState();
 	double getVersion();
@@ -206,13 +204,12 @@ public:
 	bool getNewDataAvailable();
 	void finishedReading();
 
-	void unpack(uint8_t * buf, unsigned int buf_length);
-	void unpackRobotMessage(uint8_t * buf, unsigned int offset, uint32_t len);
-	void unpackRobotMessageVersion(uint8_t * buf, unsigned int offset,
-			uint32_t len);
-	void unpackRobotState(uint8_t * buf, unsigned int offset, uint32_t len);
-	void unpackRobotStateMasterboard(uint8_t * buf, unsigned int offset);
-	void unpackRobotMode(uint8_t * buf, unsigned int offset);
+	void unpack(uint8_t* buf, unsigned int buf_length);
+	void unpackRobotMessage(uint8_t* buf, unsigned int offset, uint32_t len);
+	void unpackRobotMessageVersion(uint8_t* buf, unsigned int offset, uint32_t len);
+	void unpackRobotState(uint8_t* buf, unsigned int offset, uint32_t len);
+	void unpackRobotStateMasterboard(uint8_t* buf, unsigned int offset);
+	void unpackRobotMode(uint8_t* buf, unsigned int offset);
 };
 
 #endif /* ROBOT_STATE_H_ */

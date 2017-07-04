@@ -19,23 +19,22 @@
 #ifndef UR_DRIVER_H_
 #define UR_DRIVER_H_
 
-#include <mutex>
-#include <condition_variable>
-#include "ur_realtime_communication.h"
-#include "ur_communication.h"
-#include "do_output.h"
-#include <vector>
 #include <math.h>
-#include <string>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <condition_variable>
+#include <mutex>
+#include <string>
+#include <vector>
+#include "do_output.h"
+#include "ur_communication.h"
+#include "ur_realtime_communication.h"
 
 #include <chrono>
 
-
 class UrDriver {
-private:
+  private:
 	double maximum_time_step_;
 	double minimum_payload_;
 	double maximum_payload_;
@@ -52,24 +51,26 @@ private:
 	double firmware_version_;
 	double servoj_lookahead_time_;
 	double servoj_gain_;
-public:
+
+  public:
 	UrRealtimeCommunication* rt_interface_;
 	UrCommunication* sec_interface_;
 
-	UrDriver(std::condition_variable& rt_msg_cond,
-			std::condition_variable& msg_cond, std::string host,
-			unsigned int reverse_port = 50007, double servoj_time = 0.016, unsigned int safety_count_max =
-					12, double max_time_step = 0.08, double min_payload = 0.,
-			double max_payload = 1., double servoj_lookahead_time=0.03, double servoj_gain=300.);
+	UrDriver(std::condition_variable& rt_msg_cond, std::condition_variable& msg_cond,
+	         std::string host, unsigned int reverse_port = 50007,
+	         double servoj_time = 0.016, unsigned int safety_count_max = 12,
+	         double max_time_step = 0.08, double min_payload = 0.,
+	         double max_payload = 1., double servoj_lookahead_time = 0.03,
+	         double servoj_gain = 300.);
 	bool start();
 	void halt();
 
-	void setSpeed(double q0, double q1, double q2, double q3, double q4,
-			double q5, double acc = 100.);
+	void setSpeed(double q0, double q1, double q2, double q3, double q4, double q5,
+	              double acc = 100.);
 
 	bool doTraj(std::vector<double> inp_timestamps,
-			std::vector<std::vector<double> > inp_positions,
-			std::vector<std::vector<double> > inp_velocities);
+	            std::vector<std::vector<double> > inp_positions,
+	            std::vector<std::vector<double> > inp_velocities);
 	void servoj(std::vector<double> positions, int keepalive = 1);
 
 	void stopTraj();
@@ -78,9 +79,10 @@ public:
 	bool openServo();
 	void closeServo(std::vector<double> positions);
 
-	std::vector<double> interp_cubic(double t, double T,
-			std::vector<double> p0_pos, std::vector<double> p1_pos,
-			std::vector<double> p0_vel, std::vector<double> p1_vel);
+	std::vector<double> interp_cubic(double t, double T, std::vector<double> p0_pos,
+	                                 std::vector<double> p1_pos,
+	                                 std::vector<double> p0_vel,
+	                                 std::vector<double> p1_vel);
 
 	std::vector<std::string> getJointNames();
 	void setJointNames(std::vector<std::string> jn);
@@ -95,7 +97,6 @@ public:
 	void setServojTime(double t);
 	void setServojLookahead(double t);
 	void setServojGain(double g);
-
 };
 
 #endif /* UR_DRIVER_H_ */

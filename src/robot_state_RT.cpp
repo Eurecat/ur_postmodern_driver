@@ -81,8 +81,8 @@ double RobotStateRT::ntohd(uint64_t nf) {
 	return x;
 }
 
-std::vector<double> RobotStateRT::unpackVector(uint8_t * buf, int start_index,
-		int nr_of_vals) {
+std::vector<double> RobotStateRT::unpackVector(uint8_t* buf, int start_index,
+                                               int nr_of_vals) {
 	uint64_t q;
 	std::vector<double> ret;
 	for (int i = 0; i < nr_of_vals; i++) {
@@ -309,7 +309,7 @@ std::vector<double> RobotStateRT::getVActual() {
 	val_lock_.unlock();
 	return ret;
 }
-void RobotStateRT::unpack(uint8_t * buf) {
+void RobotStateRT::unpack(uint8_t* buf) {
 	int64_t digital_input_bits;
 	uint64_t unpack_to;
 	uint16_t offset = 0;
@@ -320,21 +320,21 @@ void RobotStateRT::unpack(uint8_t * buf) {
 	offset += sizeof(len);
 	len = ntohl(len);
 
-	//Check the correct message length is received
+	// Check the correct message length is received
 	bool len_good = true;
-	if (version_ >= 1.6 && version_ < 1.7) { //v1.6
+	if (version_ >= 1.6 && version_ < 1.7) {  // v1.6
 		if (len != 756)
 			len_good = false;
-	} else if (version_ >= 1.7 && version_ < 1.8) { //v1.7
+	} else if (version_ >= 1.7 && version_ < 1.8) {  // v1.7
 		if (len != 764)
 			len_good = false;
-	} else if (version_ >= 1.8 && version_ < 1.9) { //v1.8
+	} else if (version_ >= 1.8 && version_ < 1.9) {  // v1.8
 		if (len != 812)
 			len_good = false;
-	} else if (version_ >= 3.0 && version_ < 3.2) { //v3.0 & v3.1
+	} else if (version_ >= 3.0 && version_ < 3.2) {  // v3.0 & v3.1
 		if (len != 1044)
 			len_good = false;
-	} else if (version_ >= 3.2 && version_ < 3.3) { //v3.2
+	} else if (version_ >= 3.2 && version_ < 3.3) {  // v3.2
 		if (len != 1060)
 			len_good = false;
 	}
@@ -432,6 +432,4 @@ void RobotStateRT::unpack(uint8_t * buf) {
 	controller_updated_ = true;
 	data_published_ = true;
 	pMsg_cond_->notify_all();
-
 }
-

@@ -46,24 +46,26 @@ void RobotState::unpack(uint8_t* buf, unsigned int buf_length) {
 		memcpy(&message_type, &buf[offset + sizeof(len)], sizeof(message_type));
 		switch (message_type) {
 		case messageType::ROBOT_MESSAGE:
-			RobotState::unpackRobotMessage(buf, offset, len); //'len' is inclusive the 5 bytes from messageSize and messageType
+			RobotState::unpackRobotMessage(
+			    buf, offset,
+			    len);  //'len' is inclusive the 5 bytes from messageSize and messageType
 			break;
 		case messageType::ROBOT_STATE:
-			RobotState::unpackRobotState(buf, offset, len); //'len' is inclusive the 5 bytes from messageSize and messageType
+			RobotState::unpackRobotState(
+			    buf, offset,
+			    len);  //'len' is inclusive the 5 bytes from messageSize and messageType
 			break;
 		case messageType::PROGRAM_STATE_MESSAGE:
-			//Don't do anything atm...
+		// Don't do anything atm...
 		default:
 			break;
 		}
 		offset += len;
-
 	}
 	return;
 }
 
-void RobotState::unpackRobotMessage(uint8_t * buf, unsigned int offset,
-		uint32_t len) {
+void RobotState::unpackRobotMessage(uint8_t* buf, unsigned int offset, uint32_t len) {
 	offset += 5;
 	uint64_t timestamp;
 	int8_t source, robot_message_type;
@@ -85,19 +87,16 @@ void RobotState::unpackRobotMessage(uint8_t * buf, unsigned int offset,
 	default:
 		break;
 	}
-
 }
 
-void RobotState::unpackRobotState(uint8_t * buf, unsigned int offset,
-		uint32_t len) {
+void RobotState::unpackRobotState(uint8_t* buf, unsigned int offset, uint32_t len) {
 	offset += 5;
 	while (offset < len) {
 		int32_t length;
 		uint8_t package_type;
 		memcpy(&length, &buf[offset], sizeof(length));
 		length = ntohl(length);
-		memcpy(&package_type, &buf[offset + sizeof(length)],
-				sizeof(package_type));
+		memcpy(&package_type, &buf[offset + sizeof(length)], sizeof(package_type));
 		switch (package_type) {
 		case packageType::ROBOT_MODE_DATA:
 			val_lock_.lock();
@@ -117,26 +116,22 @@ void RobotState::unpackRobotState(uint8_t * buf, unsigned int offset,
 	}
 	new_data_available_ = true;
 	pMsg_cond_->notify_all();
-
 }
 
-void RobotState::unpackRobotMessageVersion(uint8_t * buf, unsigned int offset,
-		uint32_t len) {
+void RobotState::unpackRobotMessageVersion(uint8_t* buf, unsigned int offset,
+                                           uint32_t len) {
 	memcpy(&version_msg_.project_name_size, &buf[offset],
-			sizeof(version_msg_.project_name_size));
+	       sizeof(version_msg_.project_name_size));
 	offset += sizeof(version_msg_.project_name_size);
 	memcpy(&version_msg_.project_name, &buf[offset],
-			sizeof(char) * version_msg_.project_name_size);
+	       sizeof(char) * version_msg_.project_name_size);
 	offset += version_msg_.project_name_size;
 	version_msg_.project_name[version_msg_.project_name_size] = '\0';
-	memcpy(&version_msg_.major_version, &buf[offset],
-			sizeof(version_msg_.major_version));
+	memcpy(&version_msg_.major_version, &buf[offset], sizeof(version_msg_.major_version));
 	offset += sizeof(version_msg_.major_version);
-	memcpy(&version_msg_.minor_version, &buf[offset],
-			sizeof(version_msg_.minor_version));
+	memcpy(&version_msg_.minor_version, &buf[offset], sizeof(version_msg_.minor_version));
 	offset += sizeof(version_msg_.minor_version);
-	memcpy(&version_msg_.svn_revision, &buf[offset],
-			sizeof(version_msg_.svn_revision));
+	memcpy(&version_msg_.svn_revision, &buf[offset], sizeof(version_msg_.svn_revision));
 	offset += sizeof(version_msg_.svn_revision);
 	version_msg_.svn_revision = ntohl(version_msg_.svn_revision);
 	memcpy(&version_msg_.build_date, &buf[offset], sizeof(char) * len - offset);
@@ -146,7 +141,7 @@ void RobotState::unpackRobotMessageVersion(uint8_t * buf, unsigned int offset,
 	}
 }
 
-void RobotState::unpackRobotMode(uint8_t * buf, unsigned int offset) {
+void RobotState::unpackRobotMode(uint8_t* buf, unsigned int offset) {
 	memcpy(&robot_mode_.timestamp, &buf[offset], sizeof(robot_mode_.timestamp));
 	offset += sizeof(robot_mode_.timestamp);
 	uint8_t tmp;
@@ -163,7 +158,7 @@ void RobotState::unpackRobotMode(uint8_t * buf, unsigned int offset) {
 		robot_mode_.isRealRobotEnabled = false;
 	offset += sizeof(tmp);
 	memcpy(&tmp, &buf[offset], sizeof(tmp));
-	//printf("PowerOnRobot: %d\n", tmp);
+	// printf("PowerOnRobot: %d\n", tmp);
 	if (tmp > 0)
 		robot_mode_.isPowerOnRobot = true;
 	else
@@ -197,8 +192,7 @@ void RobotState::unpackRobotMode(uint8_t * buf, unsigned int offset) {
 	offset += sizeof(robot_mode_.robotMode);
 	uint64_t temp;
 	if (RobotState::getVersion() > 2.) {
-		memcpy(&robot_mode_.controlMode, &buf[offset],
-				sizeof(robot_mode_.controlMode));
+		memcpy(&robot_mode_.controlMode, &buf[offset], sizeof(robot_mode_.controlMode));
 		offset += sizeof(robot_mode_.controlMode);
 		memcpy(&temp, &buf[offset], sizeof(temp));
 		offset += sizeof(temp);
@@ -209,8 +203,7 @@ void RobotState::unpackRobotMode(uint8_t * buf, unsigned int offset) {
 	robot_mode_.speedScaling = RobotState::ntohd(temp);
 }
 
-void RobotState::unpackRobotStateMasterboard(uint8_t * buf,
-		unsigned int offset) {
+void RobotState::unpackRobotStateMasterboard(uint8_t* buf, unsigned int offset) {
 	if (RobotState::getVersion() < 3.0) {
 		int16_t digital_input_bits, digital_output_bits;
 		memcpy(&digital_input_bits, &buf[offset], sizeof(digital_input_bits));
@@ -221,20 +214,18 @@ void RobotState::unpackRobotStateMasterboard(uint8_t * buf,
 		mb_data_.digitalOutputBits = ntohs(digital_output_bits);
 	} else {
 		memcpy(&mb_data_.digitalInputBits, &buf[offset],
-				sizeof(mb_data_.digitalInputBits));
+		       sizeof(mb_data_.digitalInputBits));
 		offset += sizeof(mb_data_.digitalInputBits);
 		mb_data_.digitalInputBits = ntohl(mb_data_.digitalInputBits);
 		memcpy(&mb_data_.digitalOutputBits, &buf[offset],
-				sizeof(mb_data_.digitalOutputBits));
+		       sizeof(mb_data_.digitalOutputBits));
 		offset += sizeof(mb_data_.digitalOutputBits);
 		mb_data_.digitalOutputBits = ntohl(mb_data_.digitalOutputBits);
 	}
 
-	memcpy(&mb_data_.analogInputRange0, &buf[offset],
-			sizeof(mb_data_.analogInputRange0));
+	memcpy(&mb_data_.analogInputRange0, &buf[offset], sizeof(mb_data_.analogInputRange0));
 	offset += sizeof(mb_data_.analogInputRange0);
-	memcpy(&mb_data_.analogInputRange1, &buf[offset],
-			sizeof(mb_data_.analogInputRange1));
+	memcpy(&mb_data_.analogInputRange1, &buf[offset], sizeof(mb_data_.analogInputRange1));
 	offset += sizeof(mb_data_.analogInputRange1);
 	uint64_t temp;
 	memcpy(&temp, &buf[offset], sizeof(temp));
@@ -244,10 +235,10 @@ void RobotState::unpackRobotStateMasterboard(uint8_t * buf,
 	offset += sizeof(temp);
 	mb_data_.analogInput1 = RobotState::ntohd(temp);
 	memcpy(&mb_data_.analogOutputDomain0, &buf[offset],
-			sizeof(mb_data_.analogOutputDomain0));
+	       sizeof(mb_data_.analogOutputDomain0));
 	offset += sizeof(mb_data_.analogOutputDomain0);
 	memcpy(&mb_data_.analogOutputDomain1, &buf[offset],
-			sizeof(mb_data_.analogOutputDomain1));
+	       sizeof(mb_data_.analogOutputDomain1));
 	offset += sizeof(mb_data_.analogOutputDomain1);
 	memcpy(&temp, &buf[offset], sizeof(temp));
 	offset += sizeof(temp);
@@ -257,37 +248,34 @@ void RobotState::unpackRobotStateMasterboard(uint8_t * buf,
 	mb_data_.analogOutput1 = RobotState::ntohd(temp);
 
 	memcpy(&mb_data_.masterBoardTemperature, &buf[offset],
-			sizeof(mb_data_.masterBoardTemperature));
+	       sizeof(mb_data_.masterBoardTemperature));
 	offset += sizeof(mb_data_.masterBoardTemperature);
 	mb_data_.masterBoardTemperature = ntohl(mb_data_.masterBoardTemperature);
-	memcpy(&mb_data_.robotVoltage48V, &buf[offset],
-			sizeof(mb_data_.robotVoltage48V));
+	memcpy(&mb_data_.robotVoltage48V, &buf[offset], sizeof(mb_data_.robotVoltage48V));
 	offset += sizeof(mb_data_.robotVoltage48V);
 	mb_data_.robotVoltage48V = ntohl(mb_data_.robotVoltage48V);
 	memcpy(&mb_data_.robotCurrent, &buf[offset], sizeof(mb_data_.robotCurrent));
 	offset += sizeof(mb_data_.robotCurrent);
 	mb_data_.robotCurrent = ntohl(mb_data_.robotCurrent);
-	memcpy(&mb_data_.masterIOCurrent, &buf[offset],
-			sizeof(mb_data_.masterIOCurrent));
+	memcpy(&mb_data_.masterIOCurrent, &buf[offset], sizeof(mb_data_.masterIOCurrent));
 	offset += sizeof(mb_data_.masterIOCurrent);
 	mb_data_.masterIOCurrent = ntohl(mb_data_.masterIOCurrent);
 
 	memcpy(&mb_data_.safetyMode, &buf[offset], sizeof(mb_data_.safetyMode));
 	offset += sizeof(mb_data_.safetyMode);
-	memcpy(&mb_data_.masterOnOffState, &buf[offset],
-			sizeof(mb_data_.masterOnOffState));
+	memcpy(&mb_data_.masterOnOffState, &buf[offset], sizeof(mb_data_.masterOnOffState));
 	offset += sizeof(mb_data_.masterOnOffState);
 
 	memcpy(&mb_data_.euromap67InterfaceInstalled, &buf[offset],
-			sizeof(mb_data_.euromap67InterfaceInstalled));
+	       sizeof(mb_data_.euromap67InterfaceInstalled));
 	offset += sizeof(mb_data_.euromap67InterfaceInstalled);
 	if (mb_data_.euromap67InterfaceInstalled != 0) {
 		memcpy(&mb_data_.euromapInputBits, &buf[offset],
-				sizeof(mb_data_.euromapInputBits));
+		       sizeof(mb_data_.euromapInputBits));
 		offset += sizeof(mb_data_.euromapInputBits);
 		mb_data_.euromapInputBits = ntohl(mb_data_.euromapInputBits);
 		memcpy(&mb_data_.euromapOutputBits, &buf[offset],
-				sizeof(mb_data_.euromapOutputBits));
+		       sizeof(mb_data_.euromapOutputBits));
 		offset += sizeof(mb_data_.euromapOutputBits);
 		mb_data_.euromapOutputBits = ntohl(mb_data_.euromapOutputBits);
 		if (RobotState::getVersion() < 3.0) {
@@ -300,26 +288,24 @@ void RobotState::unpackRobotStateMasterboard(uint8_t * buf,
 			mb_data_.euromapCurrent = ntohs(euromap_current);
 		} else {
 			memcpy(&mb_data_.euromapVoltage, &buf[offset],
-					sizeof(mb_data_.euromapVoltage));
+			       sizeof(mb_data_.euromapVoltage));
 			offset += sizeof(mb_data_.euromapVoltage);
 			mb_data_.euromapVoltage = ntohl(mb_data_.euromapVoltage);
 			memcpy(&mb_data_.euromapCurrent, &buf[offset],
-					sizeof(mb_data_.euromapCurrent));
+			       sizeof(mb_data_.euromapCurrent));
 			offset += sizeof(mb_data_.euromapCurrent);
 			mb_data_.euromapCurrent = ntohl(mb_data_.euromapCurrent);
 		}
-
 	}
 }
 
 double RobotState::getVersion() {
 	double ver;
 	val_lock_.lock();
-	ver = version_msg_.major_version + 0.1 * version_msg_.minor_version
-			+ .0000001 * version_msg_.svn_revision;
+	ver = version_msg_.major_version + 0.1 * version_msg_.minor_version +
+	      .0000001 * version_msg_.svn_revision;
 	val_lock_.unlock();
 	return ver;
-
 }
 
 void RobotState::finishedReading() {
@@ -344,7 +330,6 @@ double RobotState::getAnalogInput1() {
 }
 double RobotState::getAnalogOutput0() {
 	return mb_data_.analogOutput0;
-
 }
 double RobotState::getAnalogOutput1() {
 	return mb_data_.analogOutput1;
