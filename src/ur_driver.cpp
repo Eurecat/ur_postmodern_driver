@@ -63,16 +63,26 @@ UrDriver::UrDriver(std::condition_variable& rt_msg_cond,
 Vector6 UrDriver::interp_cubic(double t, double T, const Vector6& p0_pos,
                                const Vector6& p1_pos, const Vector6& p0_vel,
                                const Vector6& p1_vel) {
-	/*Returns positions of the joints at time 't' */
+	/*Returns positions of the joints at time 't'
+	normalized time between 0<t<1
+	p1 = a + b + c   + d
+	v1 =     b + 2c +  3d
+	3p1 - v1 = 3a + 2b + c
+	c = 3p1 -3a -2b -v1
+	d = p1 -a -b -c
+	*/
 	Vector6 positions;
+	t = t / T;
+	const double t2 = t * t;
+	const double t3 = t * t * t;
 	for (unsigned int i = 0; i < 6; i++) {
-		double a = p0_pos[i];
-		double b = p0_vel[i];
-		double c = (-3 * p0_pos[i] + 3 * p1_pos[i] - 2 * T * p0_vel[i] - T * p1_vel[i]) /
-		           pow(T, 2);
-		double d =
-		    (2 * p0_pos[i] - 2 * p1_pos[i] + T * p0_vel[i] + T * p1_vel[i]) / pow(T, 3);
-		positions[i] = (a + b * t + c * pow(t, 2) + d * pow(t, 3));
+		const double a = p0_pos[i];
+		const double b = p0_vel[i] * T;
+		const double p1 = p1_pos[i];
+		const double v1 = p1_vel[i] * T;
+		const double c = 3 * (p1 - a) - 2 * b - v1;
+		const double d = p1 - a - b - c;
+		positions[i] = (a + b * t + c * t2 + d * t3);
 	}
 	return positions;
 }
@@ -97,8 +107,9 @@ bool UrDriver::doTraj(const std::vector<double>& inp_timestamps,
 		while (inp_timestamps[j] <= elapsed_time && j < inp_timestamps.size() - 1) {
 			j += 1;
 		}
-		positions = UrDriver::interp_cubic(elapsed_time - inp_timestamps[j - 1],
-		                                   inp_timestamps[j] - inp_timestamps[j - 1],
+		const double segment_total_time = inp_timestamps[j] - inp_timestamps[j - 1];
+		const double segment_time = elapsed_time - inp_timestamps[j - 1];
+		positions = UrDriver::interp_cubic(segment_time, segment_total_time,
 		                                   inp_positions[j - 1], inp_positions[j],
 		                                   inp_velocities[j - 1], inp_velocities[j]);
 		UrDriver::servoj(positions);
@@ -342,10 +353,10 @@ void UrDriver::setServojTime(double t) {
 	servoj_time_ = std::max(0.008, t);
 }
 void UrDriver::setServojLookahead(double t) {
-	servoj_lookahead_time_ = std::max(t, 0.03);
+	t = std::max(t, 0.03);
 	servoj_lookahead_time_ = std::min(t, 0.2);
 }
 void UrDriver::setServojGain(double g) {
-	servoj_gain_ = std::min(g, 100.0);
+	g = std::max(g, 100.0);
 	servoj_gain_ = std::min(g, 2000.0);
 }

@@ -13,6 +13,18 @@
 typedef std::array<double, 6> Vector6;
 const Vector6 ZERO_VELOCITY = { 0., 0., 0., 0., 0., 0. };
 
+inline void ToStdVector(const Vector6& in, std::vector<double>& out) {
+	out.resize(6);
+	for (int i = 0; i < 6; i++)
+		out[i] = in[i];
+}
+
+inline void ToVector6(const std::vector<double>& in, Vector6& out) {
+	assert(in.size() == 6);
+	for (int i = 0; i < 6; i++)
+		out[i] = in[i];
+}
+
 inline std::vector<double> ToStdVector(const Vector6& in) {
 	std::vector<double> out(6);
 	for (int i = 0; i < 6; i++)
